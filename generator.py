@@ -39,5 +39,5 @@ class Generator:
             hash = int(sha256(message).hexdigest(), 16)
             r, s = sigdecode_der(signature, self.curve.order)
             #print(f"Generated signature: r={r}, s={s}, nonce={nonce}")
-            signatures.append(Signature(signature.hex(), hash, r, s, 0, nonce))
+            signatures.append(Signature(signature.hex(), hash, r, s, leakage_lsb, nonce))
         return signatures

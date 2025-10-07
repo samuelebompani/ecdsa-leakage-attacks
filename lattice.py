@@ -2,10 +2,10 @@ from fpylll import IntegerMatrix, LLL
 from ecdsa import SigningKey
 
 class Lattice:
-    def __init__(self, signatures, known_bits, curve, target_pubkey):
+    def __init__(self, signatures, leakage, curve, target_pubkey):
         self.signatures = signatures
         self.hnp_samples = []
-        self.known_bits = known_bits
+        self.leakage = leakage
         self.curve = curve
         self.target_pubkey = target_pubkey
         n = len(self.signatures)
@@ -14,7 +14,7 @@ class Lattice:
 
     def build_lattice(self):
         """
-        Constructs a lattice for ECDSA signatures where the LSB 'known_bits'
+        Constructs a lattice for ECDSA signatures where the LSB 'leakage'
         of each nonce k_i are zero (trailing-zero leakage).
 
         Returns:
@@ -26,18 +26,18 @@ class Lattice:
         self.hnp_samples = []
 
         q = self.curve.order
-        kbi = 2 ** self.known_bits
+        kbi = 2 ** self.leakage
         sigs = self.signatures
 
         for i in range(n):
-            r, s, h, l = sigs[i].r, sigs[i].s, sigs[i].hash, sigs[i].leakage
+            r, s, h = sigs[i].r, sigs[i].s, sigs[i].hash
             s_inv = pow(s, -1, q)
             kbi_inv = pow(kbi, -1, q)
             self.B[i, i] = 2 * kbi * q
             self.B[n, i] = (2 * kbi * (kbi_inv * (r * s_inv) % q))
-            self.B[n + 1, i] = (2 * kbi * (kbi_inv * (l - h * s_inv) % q) + q )
-        self.B[0, n] = 1
-        self.B[1, n + 1] = q
+            self.B[n + 1, i] = (2 * kbi * (kbi_inv * (- h * s_inv) % q) + q )
+        self.B[n, n] = 1
+        self.B[n + 1, n + 1] = q
 
     def reduce_lattice_LLL(self):
         LLL.reduction(self.B)
@@ -64,15 +64,15 @@ class Lattice:
             print("x coordinate matches")
         return candidate_pk == target
 
-    def test_result_with_private_key(self, private_key) -> bool:
-        print(private_key)
+    def test_result_with_private_key(self, private_key):
         mod_n = self.curve.order
         for row in self.B:
             candidate = row[-2] % mod_n
             if candidate > 0:
                 cand1 = candidate
                 cand2 = mod_n - candidate
-                print(f"Testing candidate: {cand1} and {cand2}")
-                if(cand1 == private_key or cand2 == private_key):
-                    return True
+                if(cand1 == private_key):
+                    return cand1
+                if(cand2 == private_key):
+                    return cand2
         return False
