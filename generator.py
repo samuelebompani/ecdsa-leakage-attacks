@@ -1,6 +1,6 @@
 from random import SystemRandom
 from ecdsa import curves, SigningKey, der
-from ecdsa.util import sigencode_der
+from ecdsa.util import sigencode_der, sigdecode_der
 from hashlib import sha256
 
 from signature import Signature
@@ -28,17 +28,16 @@ class Generator:
     
     def generate(self, n, leakage_lsb=0, leakage_msb=0):
         byte_length = (self.curve.order.bit_length() + 7) // 8
-        private_key_bytes = self.private_key.to_bytes(byte_length, 'big')
-        signing_key = SigningKey.from_string(private_key_bytes, curve=self.curve)
+        signing_key = SigningKey.from_secret_exponent(self.private_key, curve=self.curve)
         signatures = []
         for _ in range(n):
-            nonce = self.random.randint(2**leakage_lsb, self.curve.order - 1)
+            max = min(2**(256 - leakage_msb) - 1, self.curve.order)
+            nonce = (self.random.randrange(0, max // (2 ** leakage_lsb))) << leakage_lsb
             message = self.random.getrandbits(8 * byte_length).to_bytes(byte_length, 'big')
             signature = signing_key.sign(message, hashfunc=sha256,
                 k=nonce,sigencode=sigencode_der)
             hash = int(sha256(message).hexdigest(), 16)
-            seq, rest = der.remove_sequence(signature)
-            r, rest = der.remove_integer(seq)
-            s, _ = der.remove_integer(rest)
+            r, s = sigdecode_der(signature, self.curve.order)
+            #print(f"Generated signature: r={r}, s={s}, nonce={nonce}")
             signatures.append(Signature(signature.hex(), hash, r, s, 0, nonce))
         return signatures
