@@ -16,12 +16,17 @@ def main():
                        help='Enable verbose output')
     parser.add_argument('--debug-leakage', action='store_true',
                        help='Debug leakage verification')
+    parser.add_argument('-a', '--attempts', type=int, default=1,
+                       help='Number of attack attempts per run (default: 1)')
     
     args = parser.parse_args()
     
     success_count = 0
     total_runs = args.runs
+    attempts = args.attempts
     total_time = 0
+    total_sussess_time = 0
+    successful_attempts = []
     
     for run in range(total_runs):
         print(f"\n{'='*50}")
@@ -45,22 +50,30 @@ def main():
                 print(f"  Sig {i}: nonce={sig.nonce}, leaked LSBs={actual_lsb}, stored leakage={sig.leakage}")
         
         start = timer()
-        result = attack(signatures, leakage=args.leakage, curve=generator.curve, 
-                       target_pubkey=generator.public_key, private_key=generator.private_key)
+        result, attempt = attack(signatures, leakage=args.leakage, curve=generator.curve, 
+                       target_pubkey=generator.public_key, total_attempts=attempts, private_key=generator.private_key)
         end = timer()
         print(f"{'='*50}")
+        total = end - start
         if result:
             success_count += 1
+            total_sussess_time += total
             print(f"✓ SUCCESS: Found private key in run {run + 1}")
+            successful_attempts.append([attempt + 1, ])
         else:
             print(f"✗ FAILED: Private key not found in run {run + 1}")
         print(f"Attack completed in {end - start:.2f} seconds")
-        total_time += (end - start)
+        total_time += total
     
     print(f"\n{'='*50}")
-    print(f"SUMMARY: {success_count}/{total_runs} successful attacks")
+    print(f"SUMMARY: {args.leakage} LSB bits known, {args.signatures} signatures, {total_runs} total runs")
+    print(f"Successful attacks: {success_count}/{total_runs}")
     print(f"Success rate: {success_count/total_runs*100:.1f}%")
     print(f"Average time per attack: {total_time/total_runs:.2f} seconds")
+    if success_count > 0:
+        print(f"Average time per successful attack: {total_sussess_time/success_count:.2f} seconds")
+    print(f"Total time for all attacks: {total_time:.2f} seconds")
+    print(f"Successful attempts: {successful_attempts}")
     print(f"{'='*50}")
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from fpylll import IntegerMatrix, LLL
+from fpylll import IntegerMatrix
 from ecdsa import SigningKey
 
 class Lattice:
@@ -21,8 +21,8 @@ class Lattice:
             B: IntegerMatrix lattice basis
             hnp_samples: list of (a_i, t_i) pairs for the hidden number problem.
         """
-        
         n = len(self.signatures)
+        self.B = IntegerMatrix(n + 2, n + 2)
         self.hnp_samples = []
 
         q = self.curve.order
@@ -36,12 +36,13 @@ class Lattice:
             self.B[i, i] = 2 * kbi * q
             self.B[n, i] = (2 * kbi * (kbi_inv * (r * s_inv) % q))
             self.B[n + 1, i] = (2 * kbi * (kbi_inv * (- h * s_inv) % q) + q )
+            #HNP samples
+            inv_2l = pow(2, -self.leakage, q)
+            t_i = (r * inv_2l * s_inv) % q
+            a_i = ((- (s_inv * h) % q) * inv_2l) % q
+            self.hnp_samples.append((a_i, t_i))
         self.B[n, n] = 1
         self.B[n + 1, n + 1] = q
-
-    def reduce_lattice_LLL(self):
-        LLL.reduction(self.B)
-        return
     
     def test_result(self):
         mod_n = self.curve.order
