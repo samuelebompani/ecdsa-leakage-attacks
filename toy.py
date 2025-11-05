@@ -18,12 +18,18 @@ def main():
                        help='Debug leakage verification')
     parser.add_argument('-a', '--attempts', type=int, default=1,
                        help='Number of attack attempts per run (default: 1)')
+    parser.add_argument('--type', choices=['BKZ', 'G6K'], default='BKZ',
+                       help='Type of lattice reduction to use (default: BKZ)')
+    parser.add_argument('-z', choices=['lsb', 'msb'], default='lsb',
+                       help='MSB or LSB leakage (default: lsb)')
     
     args = parser.parse_args()
     
     success_count = 0
     total_runs = args.runs
     attempts = args.attempts
+    attack_type = args.type
+    leakage_type = args.z
     total_time = 0
     total_sussess_time = 0
     successful_attempts = []
@@ -31,17 +37,17 @@ def main():
     for run in range(total_runs):
         print(f"\n{'='*50}")
         print(f"Run {run + 1}/{total_runs}")
-        print(f"Success so far: {success_count}/{run}")
+        print(f"Success so far: {success_count}/{run} {success_count/run*100 if run > 0 else 0:.1f}%")
         print(f"{'='*50}")
         
-        generator = Generator()
+        generator = Generator(leakage_type=leakage_type)
         print(f"Private Key: {generator.private_key}")
         if args.verbose:
             print(f"Public Key: ({generator.public_key.x()}, {generator.public_key.y()})")
         
-        signatures = generator.generate(args.signatures, leakage_lsb=args.leakage)
+        signatures = generator.generate(args.signatures, leakage=args.leakage)
         
-        print(f"Testing with {args.leakage} LSB bits known, {args.signatures} signatures")
+        print(f"Testing with {args.leakage} bits known, {args.signatures} signatures, {leakage_type.upper()} leakage")
         
         if args.debug_leakage:
             print("\nLeakage verification (first 3 signatures):")
@@ -51,7 +57,7 @@ def main():
         
         start = timer()
         result, attempt = attack(signatures, leakage=args.leakage, curve=generator.curve, 
-                       target_pubkey=generator.public_key, total_attempts=attempts, private_key=generator.private_key)
+                       target_pubkey=generator.public_key, total_attempts=attempts, private_key=generator.private_key, type=attack_type, leakage_type=leakage_type)
         end = timer()
         print(f"{'='*50}")
         total = end - start

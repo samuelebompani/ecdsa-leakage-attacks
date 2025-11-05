@@ -6,11 +6,12 @@ from hashlib import sha256
 from signature import Signature
 
 class Generator:
-    def __init__(self, curve=curves.SECP256k1):
+    def __init__(self, curve=curves.SECP256k1, leakage_type="lsb"):
         self.curve = curve
         self.random = SystemRandom()
         self.private_key = self.generate_private_key()
         self.public_key = self.get_public_key()
+        self.leakage_type = leakage_type
         
     def generate_private_key(self):
         """Generate a random private key."""
@@ -26,18 +27,28 @@ class Generator:
         """Return the public key coordinates (x, y)."""
         return (self.public_key.x(), self.public_key.y())
     
-    def generate(self, n, leakage_lsb=0, leakage_msb=0):
+    def generate(self, n, leakage=0):
         byte_length = (self.curve.order.bit_length() + 7) // 8
         signing_key = SigningKey.from_secret_exponent(self.private_key, curve=self.curve)
         signatures = []
+
         for _ in range(n):
-            max = min(2**(256 - leakage_msb) - 1, self.curve.order)
-            nonce = (self.random.randrange(0, max // (2 ** leakage_lsb))) << leakage_lsb
+            if self.leakage_type == "lsb":
+                max_unknown = self.curve.order // (2 ** leakage)
+                nonce = (self.random.randrange(0, max_unknown)) << leakage
+            elif self.leakage_type == "msb":
+                bitlen = self.curve.order.bit_length()
+                unknown_bits = bitlen - leakage
+                max_unknown = min(2 ** unknown_bits - 1, self.curve.order - 1)
+                nonce = self.random.randrange(0, max_unknown)
+            else:
+                raise ValueError("Invalid leakage_type, must be 'lsb' or 'msb'.")
+
             message = self.random.getrandbits(8 * byte_length).to_bytes(byte_length, 'big')
             signature = signing_key.sign(message, hashfunc=sha256,
                 k=nonce,sigencode=sigencode_der)
             hash = int(sha256(message).hexdigest(), 16)
             r, s = sigdecode_der(signature, self.curve.order)
             #print(f"Generated signature: r={r}, s={s}, nonce={nonce}")
-            signatures.append(Signature(signature.hex(), hash, r, s, leakage_lsb, nonce))
+            signatures.append(Signature(signature.hex(), hash, r, s, leakage, nonce))
         return signatures

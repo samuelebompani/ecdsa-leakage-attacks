@@ -12,6 +12,7 @@ def reduce_lattice_LLL(lattice):
     
 def reduce_lattice_BKZ(lattice, block_size):
     if block_size > len(lattice.signatures):
+        print(f"[!] Block size {block_size} is too large for the number of signatures {len(lattice.signatures)}")
         return None
     params = BKZ.Param(
         block_size=block_size,

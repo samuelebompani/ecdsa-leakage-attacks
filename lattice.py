@@ -12,14 +12,18 @@ class Lattice:
         self.B = IntegerMatrix(n + 2, n + 2)
         
 
-    def build_lattice(self):
+    def build_lattice(self, type="lsb"):
         """
-        Constructs a lattice for ECDSA signatures where the LSB 'leakage'
-        of each nonce k_i are zero (trailing-zero leakage).
+        Constructs a lattice for ECDSA signatures where either:
+        - LSB 'leakage' of each nonce k_i are zero (trailing-zero leakage), or
+        - MSB 'leakage' of each nonce k_i are zero (leading-zero leakage).
 
+        Args:
+            type (str): "lsb" (default) or "msb"
+        
         Returns:
             B: IntegerMatrix lattice basis
-            hnp_samples: list of (a_i, t_i) pairs for the hidden number problem.
+            hnp_samples: list of (a_i, t_i) pairs for the hidden number problem
         """
         n = len(self.signatures)
         self.B = IntegerMatrix(n + 2, n + 2)
@@ -32,17 +36,44 @@ class Lattice:
         for i in range(n):
             r, s, h = sigs[i].r, sigs[i].s, sigs[i].hash
             s_inv = pow(s, -1, q)
-            kbi_inv = pow(kbi, -1, q)
-            self.B[i, i] = 2 * kbi * q
-            self.B[n, i] = (2 * kbi * (kbi_inv * (r * s_inv) % q))
-            self.B[n + 1, i] = (2 * kbi * (kbi_inv * (- h * s_inv) % q) + q )
-            #HNP samples
-            inv_2l = pow(2, -self.leakage, q)
-            t_i = (r * inv_2l * s_inv) % q
-            a_i = ((- (s_inv * h) % q) * inv_2l) % q
+
+            # For both cases we will compute (a_i, t_i) differently
+            if type == "lsb":
+                # ---- LSB leakage ----
+                kbi_inv = pow(kbi, -1, q)
+                self.B[i + 2, i] = 2 * kbi * q
+                self.B[0, i] = 2 * kbi * (kbi_inv * (r * s_inv) % q)
+                self.B[1, i] = 2 * kbi * (kbi_inv * (-h * s_inv) % q) + q
+
+                # Hidden number problem samples (LSB version)
+                inv_2l = pow(2, -self.leakage, q)
+                t_i = (r * inv_2l * s_inv) % q
+                a_i = ((- (s_inv * h) % q) * inv_2l) % q
+
+            elif type == "msb":
+                # ---- MSB leakage ----
+                self.B[i + 2, i] = 2 * kbi * q
+                self.B[0, i] = 2 * kbi * ((r * s_inv) % q)
+                self.B[1, i] = 2 * kbi * (- (h * s_inv)) + q
+                #HNP samples
+                inv_2l = pow(2, -self.leakage, q)
+                t_i = (r * inv_2l * s_inv) % q
+                a_i = ((- (s_inv * h) % q) * inv_2l) % q
+                
+            else:
+                raise ValueError("Invalid type. Use 'lsb' or 'msb'.")
             self.hnp_samples.append((a_i, t_i))
-        self.B[n, n] = 1
-        self.B[n + 1, n + 1] = q
+        
+        if type == "lsb":
+            # Fill the last two rows
+            self.B[0, n] = 1
+            self.B[1, n + 1] = q
+        elif type == "msb":
+            self.B[0, n] = 1
+            self.B[1, n + 1] = q
+            
+        return self.B, self.hnp_samples
+
     
     def test_result(self):
         mod_n = self.curve.order
