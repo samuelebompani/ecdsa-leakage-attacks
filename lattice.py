@@ -63,8 +63,8 @@ class Lattice:
             else:
                 raise ValueError("Invalid type. Use 'lsb' or 'msb'.")
             self.hnp_samples.append((a_i, t_i))
-            self.B[0, n] = 1
-            self.B[1, n + 1] = q
+        self.B[0, n] = 1
+        self.B[1, n + 1] = q
             
         return self.B, self.hnp_samples
 
