@@ -22,6 +22,8 @@ def main():
                        help='Type of lattice reduction to use (default: BKZ)')
     parser.add_argument('-z', choices=['lsb', 'msb'], default='lsb',
                        help='MSB or LSB leakage (default: lsb)')
+    parser.add_argument('-p', choices=['predicate', 'none'], default='none',
+                       help='predicate or none (default: none)')
     
     args = parser.parse_args()
     
@@ -30,6 +32,7 @@ def main():
     attempts = args.attempts
     attack_type = args.type
     leakage_type = args.z
+    predicate_type = args.p
     total_time = 0
     total_sussess_time = 0
     successful_attempts = []
@@ -57,7 +60,7 @@ def main():
         
         start = timer()
         result, attempt = attack(signatures, leakage=args.leakage, curve=generator.curve, 
-                       target_pubkey=generator.public_key, total_attempts=attempts, private_key=generator.private_key, type=attack_type, leakage_type=leakage_type)
+                       target_pubkey=generator.public_key, total_attempts=attempts, private_key=generator.private_key, type=attack_type, leakage_type=leakage_type, predicate_type=predicate_type)
         end = timer()
         print(f"{'='*50}")
         total = end - start

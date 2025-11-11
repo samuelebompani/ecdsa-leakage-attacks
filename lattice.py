@@ -1,5 +1,6 @@
 from fpylll import IntegerMatrix
 from ecdsa import SigningKey
+import math
 
 class Lattice:
     def __init__(self, signatures, leakage, curve, target_pubkey):
@@ -63,8 +64,91 @@ class Lattice:
             else:
                 raise ValueError("Invalid type. Use 'lsb' or 'msb'.")
             self.hnp_samples.append((a_i, t_i))
+        self.B[0, n] = 1                                            #    
+        self.B[1, n + 1] = q                                        #
+            
+        return self.B, self.hnp_samples
+
+
+
+    
+    def build_lattice_predicate(self, type="lsb"):
+        """
+        Constructs a lattice for ECDSA signatures where either:
+        - LSB 'leakage' of each nonce k_i are zero (trailing-zero leakage), or
+        - MSB 'leakage' of each nonce k_i are zero (leading-zero leakage).
+
+        Args:
+            type (str): "lsb" (default) or "msb"
+        
+        Returns:
+            B: IntegerMatrix lattice basis
+            hnp_samples: list of (a_i, t_i) pairs for the hidden number problem
+        """
+        n = len(self.signatures)
+        self.B = IntegerMatrix(n + 2, n + 2)
+        self.hnp_samples = []
+
+        q = self.curve.order
+        kbi = 2 ** self.leakage
+        sigs = self.signatures
+        #tau= math.floor( q / 2**(self.leakage +1) ) / math.sqrt(3)
+
+        a_0 = 0
+        t_0 = 0
+
+        for i in range(n):
+            r, s, h = sigs[i].r, sigs[i].s, sigs[i].hash
+            s_inv = pow(s, -1, q)
+
+            # For both cases we will compute (a_i, t_i) differently
+            if type == "lsb":
+                # Hidden number problem samples (LSB version)
+                inv_2l = pow(2, -self.leakage, q)
+                t_i = (r * inv_2l * s_inv) % q
+                a_i = ((s_inv * h) %q) * inv_2l % q  #deve eessere meno per chatgpt
+
+                if i == 0:
+                    a_0 = a_i
+                    t_0 = t_i
+
+                t_prime, a_prime = t_i * pow(t_0, -1, q) %q, (a_i - a_0 * pow(t_0, -1, q) * t_i ) %q
+
+                # ---- LSB leakage ----
+                kbi_inv = pow(kbi, -1, q)
+                self.B[i + 2, i] =  q
+                self.B[0, i] = a_prime
+                self.B[1, i] = t_prime + q
+
+               
+
+            elif type == "msb":
+                # ---- MSB leakage ----
+                inv_2l = pow(2, -self.leakage, q)
+                t_i = (r * inv_2l * s_inv) % q
+                a_i = ((-(s_inv * h)) %q) * inv_2l % q
+
+                if i == 0:
+                    a_0 = a_i
+                    t_0 = t_i
+                
+                t_prime, a_prime = t_i * pow(t_0, -1, q) %q, (a_i - a_0 * pow(t_0, -1, q) * t_i ) %q
+
+                self.B[i + 2, i] =  q
+                self.B[0, i] = a_prime
+                self.B[1, i] = t_prime + q
+                
+
+                
+            else:
+                raise ValueError("Invalid type. Use 'lsb' or 'msb'.")
+            self.hnp_samples.append((a_prime, t_prime))
+
         self.B[0, n] = 1
-        self.B[1, n + 1] = q
+        if type == "lsb":   
+            self.B[1, n + 1] =( q // 2**(self.leakage +1) ) // math.sqrt(3)
+        else:
+            self.B[1, n + 1] = ( q // 2**(n-self.leakage +1) ) // math.sqrt(3)
             
         return self.B, self.hnp_samples
 
