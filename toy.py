@@ -50,7 +50,7 @@ def main():
         
         signatures = generator.generate(args.signatures, leakage=args.leakage)
         
-        print(f"Testing with {args.leakage} bits known, {args.signatures} signatures, {leakage_type.upper()} leakage")
+        print(f"Testing with {args.leakage} bits known, {args.signatures} signatures, {leakage_type.upper()} leakage, attack type: {attack_type}, predicate: {predicate_type}")
         
         if args.debug_leakage:
             print("\nLeakage verification (first 3 signatures):")
