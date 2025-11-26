@@ -26,7 +26,7 @@ class Lattice:
         if self.leakage_type == "lsb":
             self.tau = int(( q // 2**(self.leakage +1) ) / math.sqrt(3))
         else:  #msb
-            self.tau = int(( q // 2**(n - self.leakage +1) ) / math.sqrt(3))
+            self.tau = int(( q // 2**(len(self.signatures) - self.leakage +1) ) / math.sqrt(3))
         return self.tau
     
         
@@ -106,7 +106,7 @@ class Lattice:
             hnp_samples: list of (a_i, t_i) pairs for the hidden number problem
         """
         n = len(self.signatures)
-        self.B = IntegerMatrix(n + 2, n + 2)
+        self.B = IntegerMatrix(n + 1, n + 1)
         self.hnp_samples = []
 
         q = self.curve.order
@@ -114,8 +114,9 @@ class Lattice:
         sigs = self.signatures
         #tau= math.floor( q / 2**(self.leakage +1) ) / math.sqrt(3)
 
-        a_0 = 0
-        t_0 = 0
+        #a_0 = 0
+        #t_0 = 0
+        inv_2l = pow(2, -self.leakage, q)
 
         for i in range(n):
             r, s, h = sigs[i].r, sigs[i].s, sigs[i].hash
@@ -127,7 +128,7 @@ class Lattice:
                 self.leakage_type = "lsb"
                 self.tau =  int(( self.curve.order // 2**(self.leakage +1) ) / math.sqrt(3))
                 # Hidden number problem samples (LSB version)
-                inv_2l = pow(2, -self.leakage, q)
+                
                 t_i = (r * inv_2l * s_inv) % q
                 a_i = ((-s_inv * h) %q) * inv_2l % q  
 
@@ -135,17 +136,15 @@ class Lattice:
                     a_0 = a_i
                     t_0 = t_i
                     t0_inv = pow(t_0, -1, q) if t_0 != 0 else 0
-
-                t_prime = (t_i * t0_inv) %q
-                a_prime = (a_i - a_0 * t0_inv * t_i ) %q
-                # ---- LSB leakage ----
-                kbi_inv = pow(kbi, -1, q)
-                #self.B[i + 2, i] =  q
-                #self.B[0, i] = t_prime
-                #self.B[1, i] = a_prime #+ q
-                self.B[i , i] = q
-                self.B[n, i] = t_prime
-                self.B[n+1, i] = a_prime
+                else:
+                    t_prime = (t_i * t0_inv) %q
+                    a_prime = (a_i - a_0 * t0_inv * t_i ) %q
+                    # ---- LSB leakage ----
+                    kbi_inv = pow(kbi, -1, q)
+                    self.B[i-1 , i-1] = q
+                    self.B[n-1, i-1] = t_prime
+                    self.B[n, i-1] = a_prime
+               
                
 
             elif type == "msb":
@@ -160,13 +159,13 @@ class Lattice:
                     a_0 = a_i
                     t_0 = t_i
                     t0_inv = pow(t_0, -1, q) if t_0 != 0 else 0
-                
-                t_prime = t_i * t0_inv %q
-                a_prime = (a_i - a_0 * t0_inv * t_i ) %q
+                else:
+                    t_prime = t_i * t0_inv %q
+                    a_prime = (a_i - a_0 * t0_inv * t_i ) %q
 
-                self.B[i + 2, i] =  q
-                self.B[0, i] = a_prime
-                self.B[1, i] = t_prime #+ q
+                    self.B[i-1 , i-1] = q
+                    self.B[n-1, i-1] = t_prime +q
+                    self.B[n, i-1] = a_prime
                 
 
                 
@@ -175,8 +174,8 @@ class Lattice:
 
             self.hnp_samples.append((a_i, t_i))
 
-        self.B[n, n] = 1   
-        self.B[n + 1, n + 1] = self.tau
+        self.B[n-1, n-1] = 1   
+        self.B[n, n] = self.tau
         
 
             
